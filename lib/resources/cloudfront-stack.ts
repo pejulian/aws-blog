@@ -26,7 +26,7 @@ export class CloudfrontStack extends Stack {
   private distribution: Distribution;
 
   constructor(scope: Construct, id: string, props: CloudfrontStackProps) {
-    super(scope, id, props);
+    super(scope, id, { ...props, description: `[jucy] Distribution stack` });
 
     const siteBucket = Bucket.fromBucketArn(
       this,

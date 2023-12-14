@@ -19,7 +19,7 @@ export class DomainStack extends Stack {
   private certificate: Certificate;
 
   constructor(scope: Construct, id: string, props: DomainStackProps) {
-    super(scope, id, props);
+    super(scope, id, { ...props, description: `[jucy] Domain and certificate stack` });
 
     const hostedZoneId = StringParameter.valueForStringParameter(
       this,

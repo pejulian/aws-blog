@@ -11,14 +11,13 @@ import {
 import { BucketDeployment, Source } from "aws-cdk-lib/aws-s3-deployment";
 
 export class BucketStack extends Stack {
-
-  public static readonly BUCKET_EXPORT_NAME = 'JucySiteBucket';
+  public static readonly BUCKET_EXPORT_NAME = "JucySiteBucket";
 
   private bucket: Bucket;
   private bucketDeployment: BucketDeployment;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
-    super(scope, id, props);
+    super(scope, id, { ...props, description: `[jucy] Site Bucket stack` });
 
     this.bucket = new Bucket(this, `SiteBucket`, {
       bucketName: `${id}-site-content`,
