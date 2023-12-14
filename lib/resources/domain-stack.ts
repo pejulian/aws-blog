@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Stack, StackProps } from "aws-cdk-lib";
+import { CfnOutput, Stack, StackProps } from "aws-cdk-lib";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
 import {
@@ -14,6 +14,8 @@ export interface DomainStackProps extends StackProps {
 }
 
 export class DomainStack extends Stack {
+  public static readonly CERTIFICATE_ARN_EXPORT_NAME = `JucyCertificate`;
+
   private certificate: Certificate;
 
   constructor(scope: Construct, id: string, props: DomainStackProps) {
@@ -40,6 +42,9 @@ export class DomainStack extends Stack {
       validation: CertificateValidation.fromDns(hostedZone),
     });
 
-    
+    new CfnOutput(this, `SiteCertificateExport`, {
+      value: this.certificate.certificateArn,
+      exportName: DomainStack.CERTIFICATE_ARN_EXPORT_NAME,
+    });
   }
 }
