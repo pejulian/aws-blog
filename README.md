@@ -1,14 +1,51 @@
-# Welcome to your CDK TypeScript project
+# Static sub site
 
-This is a blank project for CDK development with TypeScript.
+This IaC deploys the specified sub site under the given apex domain.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Pre-requisites
 
-## Useful commands
+- You should own a valid registered domain
+- You should have (and own) the HostedZone for the apex domain.
+- This code should be able to write the subdomain record into the apex domain's hosted zone as an A record
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
-* `npx cdk diff`    compare deployed stack with current state
-* `npx cdk synth`   emits the synthesized CloudFormation template
+## For jucy.julian-pereira.com
+
+For example, to create the sub-site `jucy.julian-pereira.com`, pass the following context values:
+
+> Use the pre-made `cdk-*.sh` scripts in the repository root to reduce manual steps for deployment
+
+---
+
+> Replace `pejulian-iam@335952011029` with the relevant profile stored in your `~/.aws/credentials`
+
+---
+
+Synthesize cloudformation template:
+
+```bash
+./cdk-synth.sh pejulian-iam@335952011029 ap-southeast-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "siteDomain=julian-pereira.com" --context "siteSubDomain=jucy"
+```
+
+---
+
+Bootstrap:
+
+```bash
+./cdk-bootstrap.sh pejulian-iam@335952011029 ap-southeast-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "siteDomain=julian-pereira.com" --context "siteSubDomain=jucy"
+```
+
+---
+
+Deploy:
+
+```bash
+./cdk-deploy.sh pejulian-iam@335952011029 ap-southeast-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "siteDomain=julian-pereira.com" --context "siteSubDomain=jucy"
+```
+
+---
+
+Destroy
+
+```bash
+./cdk-deploy.sh pejulian-iam@335952011029 ap-southeast-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "siteDomain=julian-pereira.com" --context "siteSubDomain=jucy"
+```
