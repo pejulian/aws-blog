@@ -7,6 +7,9 @@ import { Stack, StackProps } from "aws-cdk-lib/core";
 import { SiteDistributionStack } from "./stacks/site-distribution-stack";
 import { DomainStack } from "./stacks/domain-stack";
 import { RouteStack } from "./stacks/route-stack";
+import { AuthStack } from "./stacks/auth-stack";
+import { EdgeLambdaStack } from "./stacks/edge-lambda-stack";
+import { PermissionsStack } from "./stacks/permissions-stack";
 
 export interface MainStackProps extends StackProps {
   hostedZoneId: string;
@@ -18,6 +21,9 @@ export class MainStack extends Stack {
   private domainStack: DomainStack;
   private siteDistributionStack: SiteDistributionStack;
   private routeStack: RouteStack;
+  private authStack: AuthStack;
+  private permissionsStack: PermissionsStack;
+  private edgeLambdaStack: EdgeLambdaStack;
 
   constructor(scope: Construct, id: string, props: MainStackProps) {
     super(scope, id, props);
@@ -60,6 +66,35 @@ export class MainStack extends Stack {
       },
     });
 
+    // ===============================================================
+    // Lambda
+    // ===============================================================
+
+    this.permissionsStack = new PermissionsStack(this, `PermissionsStack`, {
+      siteSubDomain: props.siteSubDomain,
+    });
+
+    this.edgeLambdaStack = new EdgeLambdaStack(this, `EdgeLambdaStack`, {
+      siteSubDomain: props.siteSubDomain,
+      roleArn: this.permissionsStack.edgeLambdaRole.roleArn,
+    });
+
+    this.authStack = new AuthStack(this, `AuthStack`, {
+      siteDomain: props.siteDomain,
+      siteSubDomain: props.siteSubDomain,
+      hostedZoneId: props.hostedZoneId,
+      distributionDomainName:
+        this.siteDistributionStack.distribution.distributionDomainName,
+      env: {
+        account: props.env?.account,
+        region: props.env?.region,
+      },
+    });
+
+    this.siteDistributionStack.addDependency(this.domainStack);
     this.routeStack.addDependency(this.siteDistributionStack);
+    this.authStack.addDependency(this.siteDistributionStack);
+
+    this.edgeLambdaStack.addDependency(this.permissionsStack);
   }
 }
