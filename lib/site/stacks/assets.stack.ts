@@ -21,6 +21,8 @@ import {
 import {
   AuthorizationType,
   LambdaIntegration,
+  MockIntegration,
+  PassthroughBehavior,
   Resource,
   RestApi,
 } from "aws-cdk-lib/aws-apigateway";
@@ -173,14 +175,56 @@ export class AssetsStack extends NestedStack {
       }
     );
 
-    this._uploadResource.addCorsPreflight({
-      allowOrigins: CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_ORIGIN.split(","),
-      allowCredentials:
-        CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_CREDENTIALS === "true",
-      allowHeaders: CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_HEADERS.split(","),
-      allowMethods: CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_METHODS.split(","),
-      exposeHeaders: CORS_ENV_VARS.ACCESS_CONTROL_EXPOSE_HEADERS.split(","),
-    });
+    this._uploadResource.addMethod(
+      "OPTIONS",
+      new MockIntegration({
+        passthroughBehavior: PassthroughBehavior.NEVER,
+        requestTemplates: {
+          "application/json": `{
+            #if($context.identity.apiKey)
+              "statusCode": 204
+            #else
+              "statusCode": 500
+            #end
+          }`,
+        },
+        integrationResponses: [
+          {
+            statusCode: "200",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Headers": `'${CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_HEADERS.split(
+                ","
+              )}'`,
+              "method.response.header.Access-Control-Allow-Origin": `'${CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_ORIGIN.split(
+                ","
+              )}'`,
+              "method.response.header.Access-Control-Allow-Credentials": `'${CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_CREDENTIALS}'`,
+              "method.response.header.Access-Control-Allow-Methods": `'${CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_METHODS.split(
+                ","
+              )}'`,
+              "method.response.header.Access-Control-Expose-Headers": `'${CORS_ENV_VARS.ACCESS_CONTROL_EXPOSE_HEADERS.split(
+                ","
+              )}'`,
+            },
+          },
+        ],
+      }),
+      {
+        apiKeyRequired: true,
+        methodResponses: [
+          {
+            statusCode: "204",
+            responseParameters: {
+              "method.response.header.Access-Control-Allow-Headers": true,
+              "method.response.header.Access-Control-Allow-Methods": true,
+              "method.response.header.Access-Control-Allow-Credentials": true,
+              "method.response.header.Access-Control-Allow-Origin": true,
+              "method.response.header.Access-Control-Expose-Headers": true,
+            },
+          },
+        ],
+      }
+    );
   }
 
   get assetsBucket(): Bucket {

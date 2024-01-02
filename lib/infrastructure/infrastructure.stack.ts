@@ -123,7 +123,7 @@ export class InfrastructureStack extends Stack {
       apiHostedZone: this.domainStack.apiHostedZone,
       apiCertificate: this.domainStack.apiCertificate,
       userPool: this.authStack?.userPool,
-      enableLogging: true,
+      enableLogging: false,
     });
 
     // ===============================================================

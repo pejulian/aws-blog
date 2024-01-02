@@ -53,13 +53,6 @@ import { UserPool } from "aws-cdk-lib/aws-cognito";
 import { HttpOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
 import { LogGroup, LogGroupClass, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
-import {
-  AnyPrincipal,
-  Effect,
-  PolicyDocument,
-  PolicyStatement,
-} from "aws-cdk-lib/aws-iam";
-import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -106,50 +99,12 @@ export class ApiStack extends NestedStack {
     // REST API
     // ==============================================================================
 
-    let restApiLogGroup: LogGroup | undefined;
-
-    if (props.enableLogging) {
-      new LogGroup(this, `RestApiLogGroup`, {
-        retention: RetentionDays.ONE_DAY,
-        removalPolicy: RemovalPolicy.DESTROY,
-        logGroupClass: LogGroupClass.STANDARD,
-      });
-    }
-
-    const cloudfrontIpsList = axios.get<
-      Readonly<{
-        CLOUDFRONT_GLOBAL_IP_LIST: Array<string>;
-        CLOUDFRONT_REGIONAL_EDGE_IP_LIST: Array<string>;
-      }>
-    >(`https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips`);
-
     this._restApi = new RestApi(this, `RestApi`, {
       description: `The REST API for ${props.siteDomain}`,
       cloudWatchRole: true,
       cloudWatchRoleRemovalPolicy: RemovalPolicy.DESTROY,
       restApiName: `${props.subDomain}RestApi`,
       endpointTypes: [EndpointType.REGIONAL],
-      policy: new PolicyDocument({
-        statements: [
-          new PolicyStatement({
-            actions: ["execute-api:Invoke"],
-            resources: ["execute-api:/*/*/*"],
-            principals: [new AnyPrincipal()],
-            effect: Effect.ALLOW,
-          }),
-          new PolicyStatement({
-            actions: ["execute-api:Invoke"],
-            resources: ["execute-api:/*/*/*"],
-            principals: [new AnyPrincipal()],
-            effect: Effect.DENY,
-            conditions: {
-              NotIpAddress: {
-                "aws:SourceIp": [cloudfrontIpsList],
-              },
-            },
-          }),
-        ],
-      }),
       deploy: true,
       deployOptions: {
         stageName: "prod",
@@ -157,21 +112,26 @@ export class ApiStack extends NestedStack {
         loggingLevel: MethodLoggingLevel.INFO,
         metricsEnabled: false,
         cachingEnabled: false,
-        ...(props.enableLogging &&
-          restApiLogGroup && {
-            accessLogDestination: new LogGroupLogDestination(restApiLogGroup),
-            accessLogFormat: AccessLogFormat.jsonWithStandardFields({
-              caller: false,
-              httpMethod: true,
-              ip: true,
-              protocol: true,
-              requestTime: true,
-              resourcePath: true,
-              responseLength: true,
-              status: true,
-              user: true,
-            }),
+        ...(props.enableLogging && {
+          accessLogDestination: new LogGroupLogDestination(
+            new LogGroup(this, `RestApiLogGroup`, {
+              retention: RetentionDays.ONE_DAY,
+              removalPolicy: RemovalPolicy.DESTROY,
+              logGroupClass: LogGroupClass.STANDARD,
+            })
+          ),
+          accessLogFormat: AccessLogFormat.jsonWithStandardFields({
+            caller: false,
+            httpMethod: true,
+            ip: true,
+            protocol: true,
+            requestTime: true,
+            resourcePath: true,
+            responseLength: true,
+            status: true,
+            user: true,
           }),
+        }),
         tracingEnabled: props.enableTracing,
       },
       domainName: {
@@ -214,6 +174,10 @@ export class ApiStack extends NestedStack {
       quota: {
         limit: 1000,
         period: Period.DAY,
+      },
+      throttle: {
+        burstLimit: 10,
+        rateLimit: 10,
       },
     });
 
@@ -352,7 +316,7 @@ export class ApiStack extends NestedStack {
             // this is fun: it looks like no headers will be forwarded, but
             // actually all the headers from the cachePolicy.headerBehavior will be
             // forwarded anyhow. Nice, AWS, very nice....NOT!
-            headerBehavior: OriginRequestHeaderBehavior.none(), //allowList('Origin', 'Referer'),
+            headerBehavior: OriginRequestHeaderBehavior.none(), //allowList('Origin', 'Referer', 'Authorization'),
             queryStringBehavior: OriginRequestQueryStringBehavior.all(),
             cookieBehavior: OriginRequestCookieBehavior.none(),
             originRequestPolicyName: "ApiGwWithAuthorization",
