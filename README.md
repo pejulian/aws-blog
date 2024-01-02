@@ -4,9 +4,9 @@ This IaC deploys the specified sub site under the given apex domain.
 
 ## Pre-requisites
 
-- You should own a valid registered domain
-- You should have (and own) the HostedZone for the apex domain.
-- This code should be able to write the subdomain record into the apex domain's hosted zone as an A record
+- You should own a valid registered domain (e.g `julian-pereira.com`)
+- You should own the above top-level domain
+- This deployment should be able to write subdomain records for traffic delegation into the apex domain's hosted zone as an NS record
 
 ## For jucy.julian-pereira.com
 
@@ -23,7 +23,7 @@ For example, to create the sub-site `jucy.julian-pereira.com`, pass the followin
 Synthesize cloudformation template:
 
 ```bash
-./cdk-synth.sh pejulian-iam@335952011029 ap-southeast-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "siteDomain=julian-pereira.com" --context "siteSubDomain=jucy"
+./cdk-synth.sh pejulian-iam@335952011029 us-east-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "parentDomain=julian-pereira.com" --context "subDomain=jucy" --context "enableAuthentication=true"
 ```
 
 ---
@@ -31,7 +31,7 @@ Synthesize cloudformation template:
 Bootstrap:
 
 ```bash
-./cdk-bootstrap.sh pejulian-iam@335952011029 ap-southeast-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "siteDomain=julian-pereira.com" --context "siteSubDomain=jucy"
+./cdk-bootstrap.sh pejulian-iam@335952011029 us-east-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "parentDomain=julian-pereira.com" --context "subDomain=jucy" --context "enableAuthentication=true"
 ```
 
 ---
@@ -39,7 +39,7 @@ Bootstrap:
 Deploy:
 
 ```bash
-./cdk-deploy.sh pejulian-iam@335952011029 ap-southeast-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "siteDomain=julian-pereira.com" --context "siteSubDomain=jucy"
+./cdk-deploy.sh pejulian-iam@335952011029 us-east-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "parentDomain=julian-pereira.com" --context "subDomain=jucy" --context "enableAuthentication=true"
 ```
 
 ---
@@ -47,5 +47,5 @@ Deploy:
 Destroy
 
 ```bash
-./cdk-deploy.sh pejulian-iam@335952011029 ap-southeast-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "siteDomain=julian-pereira.com" --context "siteSubDomain=jucy"
+./cdk-destroy.sh pejulian-iam@335952011029 us-east-1 --context "hostedZoneId=Z01113202LCYIASZV1KVG" --context "parentDomain=julian-pereira.com" --context "subDomain=jucy" --context "enableAuthentication=true"
 ```

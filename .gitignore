@@ -9,3 +9,6 @@ cdk.out
 
 # Ignore built assets
 dist
+callback-target
+default-target
+assets-output

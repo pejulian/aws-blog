@@ -1,5 +1,5 @@
 {
-  "app": "npx ts-node --prefer-ts-exts bin/app.ts",
+  "app": "node --experimental-specifier-resolution=node --loader ts-node/esm ./bin/app.ts",
   "requireApproval": "never",
   "watch": {
     "include": ["**"],

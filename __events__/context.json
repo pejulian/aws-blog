@@ -1,0 +1,10 @@
+{
+  "callbackWaitsForEmptyEventLoop": true,
+  "functionVersion": "32",
+  "functionName": "us-east-1.jucy-julian-pereira-com-default-handler",
+  "memoryLimitInMB": "128",
+  "logGroupName": "/aws/lambda/us-east-1.jucy-julian-pereira-com-default-handler",
+  "logStreamName": "2023/12/27/[32]b6e5cf89592946e29e5937e4492a1d28",
+  "invokedFunctionArn": "arn:aws:lambda:eu-central-1:335952011029:function:us-east-1.jucy-julian-pereira-com-default-handler:32",
+  "awsRequestId": "86068115-daf3-4d9a-9a06-e0230011e5a3"
+}

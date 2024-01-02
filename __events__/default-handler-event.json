@@ -1,0 +1,118 @@
+{
+  "Records": [
+    {
+      "cf": {
+        "config": {
+          "distributionDomainName": "d3873387yz3ckl.cloudfront.net",
+          "distributionId": "E1HUXXHWLDO029",
+          "eventType": "viewer-request",
+          "requestId": "Dk8Z_zGAFv-8qX4DmZW8ZwgFwMX2486T2aGoDx0qrfOQ2l_N6gsC0w=="
+        },
+        "request": {
+          "body": {
+            "action": "read-only",
+            "data": "",
+            "encoding": "base64",
+            "inputTruncated": false
+          },
+          "clientIp": "58.71.214.80",
+          "headers": {
+            "host": [
+              {
+                "key": "Host",
+                "value": "jucy.julian-pereira.com"
+              }
+            ],
+            "user-agent": [
+              {
+                "key": "User-Agent",
+                "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+              }
+            ],
+            "cache-control": [
+              {
+                "key": "cache-control",
+                "value": "max-age=0"
+              }
+            ],
+            "sec-ch-ua": [
+              {
+                "key": "sec-ch-ua",
+                "value": "\"Google Chrome\";v=\"119\", \"Chromium\";v=\"119\", \"Not?A_Brand\";v=\"24\""
+              }
+            ],
+            "sec-ch-ua-mobile": [
+              {
+                "key": "sec-ch-ua-mobile",
+                "value": "?0"
+              }
+            ],
+            "sec-ch-ua-platform": [
+              {
+                "key": "sec-ch-ua-platform",
+                "value": "\"macOS\""
+              }
+            ],
+            "dnt": [
+              {
+                "key": "dnt",
+                "value": "1"
+              }
+            ],
+            "upgrade-insecure-requests": [
+              {
+                "key": "upgrade-insecure-requests",
+                "value": "1"
+              }
+            ],
+            "accept": [
+              {
+                "key": "accept",
+                "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+              }
+            ],
+            "sec-fetch-site": [
+              {
+                "key": "sec-fetch-site",
+                "value": "none"
+              }
+            ],
+            "sec-fetch-mode": [
+              {
+                "key": "sec-fetch-mode",
+                "value": "navigate"
+              }
+            ],
+            "sec-fetch-user": [
+              {
+                "key": "sec-fetch-user",
+                "value": "?1"
+              }
+            ],
+            "sec-fetch-dest": [
+              {
+                "key": "sec-fetch-dest",
+                "value": "document"
+              }
+            ],
+            "accept-encoding": [
+              {
+                "key": "accept-encoding",
+                "value": "gzip, deflate, br"
+              }
+            ],
+            "accept-language": [
+              {
+                "key": "accept-language",
+                "value": "en-US,en;q=0.9"
+              }
+            ]
+          },
+          "method": "GET",
+          "querystring": "",
+          "uri": "/"
+        }
+      }
+    }
+  ]
+}
