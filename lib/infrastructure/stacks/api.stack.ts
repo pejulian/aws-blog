@@ -10,6 +10,7 @@ import {
   RemovalPolicy,
 } from "aws-cdk-lib/core";
 import {
+  AddBehaviorOptions,
   AllowedMethods,
   CacheCookieBehavior,
   CacheHeaderBehavior,
@@ -19,16 +20,17 @@ import {
   Function,
   FunctionCode,
   FunctionEventType,
+  GeoRestriction,
   OriginProtocolPolicy,
   OriginRequestCookieBehavior,
   OriginRequestHeaderBehavior,
   OriginRequestPolicy,
   OriginRequestQueryStringBehavior,
   OriginSslPolicy,
+  PriceClass,
   ViewerProtocolPolicy,
 } from "aws-cdk-lib/aws-cloudfront";
-import { PrefixList } from "aws-cdk-lib/aws-ec2";
-import { ApiGateway } from "aws-cdk-lib/aws-route53-targets";
+import { ApiGateway, CloudFrontTarget } from "aws-cdk-lib/aws-route53-targets";
 import {
   Cors,
   RestApi,
@@ -62,13 +64,15 @@ export interface ApiStackProps extends NestedStackProps {
   parentDomain: string;
   siteDomain: string;
   apiDomain: string;
-  distribution: Distribution;
+  siteDistribution: Distribution;
   apiHostedZone: HostedZone;
   apiCertificate: Certificate;
   userPool: UserPool | undefined;
   geolocationCountryCode?: string;
-  enableLogging?: boolean;
-  enableTracing?: boolean;
+  enableApiLogs?: boolean;
+  enableApiTracing?: boolean;
+  apiDistributionPriceClass?: PriceClass;
+  apiDistributionGeoRestriction?: string[];
 }
 
 export class ApiStack extends NestedStack {
@@ -77,6 +81,7 @@ export class ApiStack extends NestedStack {
   private _restApiKey: ApiKey;
   private _usagePlan: UsagePlan;
   private _corsOptions: CorsOptions;
+  private _apiDistribution: Distribution;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, {
@@ -112,10 +117,10 @@ export class ApiStack extends NestedStack {
         loggingLevel: MethodLoggingLevel.INFO,
         metricsEnabled: false,
         cachingEnabled: false,
-        ...(props.enableLogging && {
+        ...(props.enableApiLogs && {
           accessLogDestination: new LogGroupLogDestination(
             new LogGroup(this, `RestApiLogGroup`, {
-              retention: RetentionDays.ONE_DAY,
+              retention: RetentionDays.THREE_DAYS,
               removalPolicy: RemovalPolicy.DESTROY,
               logGroupClass: LogGroupClass.STANDARD,
             })
@@ -132,7 +137,7 @@ export class ApiStack extends NestedStack {
             user: true,
           }),
         }),
-        tracingEnabled: props.enableTracing,
+        tracingEnabled: props.enableApiTracing,
       },
       domainName: {
         certificate: props.apiCertificate,
@@ -220,14 +225,6 @@ export class ApiStack extends NestedStack {
       }
     );
 
-    new ARecord(this, `RestApiRecord`, {
-      recordName: props.apiDomain,
-      zone: props.apiHostedZone,
-      comment: `Alias record for routing traffic to ${props.apiDomain}`,
-      target: RecordTarget.fromAlias(new ApiGateway(this._restApi)),
-      ttl: Duration.seconds(60),
-    });
-
     // ==============================================================================
     // REST API Authorizer with Cognito User Pool integration
     // ==============================================================================
@@ -277,59 +274,91 @@ export class ApiStack extends NestedStack {
       }
     );
 
-    props.distribution.addBehavior(
-      "api/*",
-      new HttpOrigin(apiEndPointDomainName, {
-        originPath: `/${this._restApi.deploymentStage.stageName}`,
-        protocolPolicy: OriginProtocolPolicy.HTTPS_ONLY,
-        originSslProtocols: [OriginSslPolicy.TLS_V1_2],
-        customHeaders: {
-          "X-Api-Key": restApiKeyValue
-            .secretValueFromJson("api_key")
-            .unsafeUnwrap(),
-        },
-      }),
-      {
-        compress: true,
-        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        allowedMethods: AllowedMethods.ALLOW_ALL,
-        cachePolicy: new CachePolicy(this, "RestApiCachePolicy", {
-          headerBehavior: CacheHeaderBehavior.allowList(
-            "Authorization",
-            "Origin",
-            "Referer"
-          ),
-          queryStringBehavior: CacheQueryStringBehavior.all(),
-          cachePolicyName: "ApiGwWithAuthorization",
-          cookieBehavior: CacheCookieBehavior.all(),
-          enableAcceptEncodingBrotli: true,
-          enableAcceptEncodingGzip: true,
-          // see https://github.com/aws/aws-cdk/issues/16977 - we need to set the maxTtl to the smallest possible value
-          maxTtl: Duration.seconds(1),
-          minTtl: Duration.seconds(0),
-          defaultTtl: Duration.seconds(0),
-        }),
-        originRequestPolicy: new OriginRequestPolicy(
-          this,
-          "RestApiOriginRequestPolicy",
-          {
-            // this is fun: it looks like no headers will be forwarded, but
-            // actually all the headers from the cachePolicy.headerBehavior will be
-            // forwarded anyhow. Nice, AWS, very nice....NOT!
-            headerBehavior: OriginRequestHeaderBehavior.none(), //allowList('Origin', 'Referer', 'Authorization'),
-            queryStringBehavior: OriginRequestQueryStringBehavior.all(),
-            cookieBehavior: OriginRequestCookieBehavior.none(),
-            originRequestPolicyName: "ApiGwWithAuthorization",
-          }
+    // ==============================================================================
+    // Distribution setup
+    // ==============================================================================
+
+    const apiGatewayOrigin = new HttpOrigin(apiEndPointDomainName, {
+      originPath: `/${this._restApi.deploymentStage.stageName}`,
+      protocolPolicy: OriginProtocolPolicy.HTTPS_ONLY,
+      originSslProtocols: [OriginSslPolicy.TLS_V1_2],
+      customHeaders: {
+        "X-Api-Key": restApiKeyValue
+          .secretValueFromJson("api_key")
+          .unsafeUnwrap(),
+      },
+    });
+
+    const apiGatewayOriginBehaviorOptions: AddBehaviorOptions = {
+      compress: true,
+      viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      allowedMethods: AllowedMethods.ALLOW_ALL,
+      cachePolicy: new CachePolicy(this, "RestApiCachePolicy", {
+        headerBehavior: CacheHeaderBehavior.allowList(
+          "Authorization",
+          "Origin",
+          "Referer"
         ),
-        functionAssociations: [
-          {
-            function: apiRewriteFunction,
-            eventType: FunctionEventType.VIEWER_REQUEST,
-          },
-        ],
-      }
-    );
+        queryStringBehavior: CacheQueryStringBehavior.all(),
+        cachePolicyName: "ApiGwWithAuthorization",
+        cookieBehavior: CacheCookieBehavior.all(),
+        enableAcceptEncodingBrotli: true,
+        enableAcceptEncodingGzip: true,
+        // see https://github.com/aws/aws-cdk/issues/16977 - we need to set the maxTtl to the smallest possible value
+        maxTtl: Duration.seconds(1),
+        minTtl: Duration.seconds(0),
+        defaultTtl: Duration.seconds(0),
+      }),
+      originRequestPolicy: new OriginRequestPolicy(
+        this,
+        "RestApiOriginRequestPolicy",
+        {
+          // this is fun: it looks like no headers will be forwarded, but
+          // actually all the headers from the cachePolicy.headerBehavior will be
+          // forwarded anyhow. Nice, AWS, very nice....NOT!
+          headerBehavior: OriginRequestHeaderBehavior.none(), //allowList('Origin', 'Referer', 'Authorization'),
+          queryStringBehavior: OriginRequestQueryStringBehavior.all(),
+          cookieBehavior: OriginRequestCookieBehavior.none(),
+          originRequestPolicyName: "ApiGwWithAuthorization",
+        }
+      ),
+    };
+
+    this._apiDistribution = new Distribution(this, `ApiDistribution`, {
+      priceClass: props.apiDistributionPriceClass ?? PriceClass.PRICE_CLASS_100,
+      geoRestriction: props.apiDistributionGeoRestriction
+        ? GeoRestriction.allowlist(...props.apiDistributionGeoRestriction)
+        : GeoRestriction.allowlist("MY"),
+      comment: `Distribution for ${props.apiDomain}`,
+      domainNames: [props.apiDomain],
+      certificate: props.apiCertificate,
+      enableLogging: false,
+      defaultBehavior: {
+        origin: apiGatewayOrigin,
+        ...apiGatewayOriginBehaviorOptions,
+      },
+    });
+
+    new ARecord(this, `RestApiRecord`, {
+      recordName: props.apiDomain,
+      zone: props.apiHostedZone,
+      comment: `Alias record for routing traffic to ${props.apiDomain}`,
+      target: RecordTarget.fromAlias(
+        new CloudFrontTarget(this._apiDistribution)
+      ),
+      // target: RecordTarget.fromAlias(new ApiGateway(this._restApi)),
+      ttl: Duration.seconds(60),
+    });
+
+    props.siteDistribution.addBehavior("api/*", apiGatewayOrigin, {
+      ...apiGatewayOriginBehaviorOptions,
+      functionAssociations: [
+        {
+          function: apiRewriteFunction,
+          eventType: FunctionEventType.VIEWER_REQUEST,
+        },
+      ],
+    });
 
     // ==============================================================================
     // Outputs
@@ -338,6 +367,10 @@ export class ApiStack extends NestedStack {
     this.exportValue(this._restApiKey.keyId, {
       name: `${props.subDomain}RestApiKeyId`,
     });
+  }
+
+  get apiDistribution(): Distribution {
+    return this._apiDistribution;
   }
 
   get restApi(): RestApi {

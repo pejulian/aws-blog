@@ -24,6 +24,8 @@ export interface InfrastructureStackProps extends StackProps {
   authDomain: string;
   apiDomain: string;
   enableAuthentication: boolean;
+  enableApiLogging: boolean;
+  enableApiTracing: boolean;
 }
 
 export class InfrastructureStack extends Stack {
@@ -119,11 +121,12 @@ export class InfrastructureStack extends Stack {
       subDomain: props.subDomain,
       siteDomain: props.siteDomain,
       apiDomain: props.apiDomain,
-      distribution: this.siteDistributionStack.distribution,
+      siteDistribution: this.siteDistributionStack.distribution,
       apiHostedZone: this.domainStack.apiHostedZone,
       apiCertificate: this.domainStack.apiCertificate,
       userPool: this.authStack?.userPool,
-      enableLogging: false,
+      enableApiLogs: props.enableApiLogging,
+      enableApiTracing: props.enableApiTracing,
     });
 
     // ===============================================================

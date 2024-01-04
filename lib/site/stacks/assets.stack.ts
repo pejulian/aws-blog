@@ -4,6 +4,8 @@ import { fileURLToPath } from "url";
 import { Construct } from "constructs";
 
 import {
+  Arn,
+  ArnFormat,
   Duration,
   NestedStack,
   NestedStackProps,
@@ -12,6 +14,7 @@ import {
 import { BlockPublicAccess, Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import {
+  AnyPrincipal,
   Effect,
   ManagedPolicy,
   PolicyStatement,
@@ -21,8 +24,6 @@ import {
 import {
   AuthorizationType,
   LambdaIntegration,
-  MockIntegration,
-  PassthroughBehavior,
   Resource,
   RestApi,
 } from "aws-cdk-lib/aws-apigateway";
@@ -94,14 +95,63 @@ export class AssetsStack extends NestedStack {
 
     const siteDomain = `${props.subDomain}.${props.parentDomain}`;
 
+    const assetsBucketName = `${props.subDomain}-assets-bucket-${this.account}`;
     this._assetsBucket = new Bucket(this, `AssetsBucket`, {
-      bucketName: `${props.subDomain}-assets-bucket-${this.account}`,
+      bucketName: assetsBucketName,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
       publicReadAccess: false,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
     });
+
+    // this._assetsBucket.addToResourcePolicy(
+    //   new PolicyStatement({
+    //     sid: `listObjectsForUser`,
+    //     principals: [new AnyPrincipal()],
+    //     effect: Effect.ALLOW,
+    //     actions: ["s3:ListBucket"],
+    //     resources: [
+    //       Arn.format({
+    //         arnFormat: ArnFormat.NO_RESOURCE_NAME,
+    //         service: "s3",
+    //         account: this.account,
+    //         region: this.region,
+    //         partition: this.partition,
+    //         resource: assetsBucketName,
+    //       }),
+    //     ],
+    //     conditions: {
+    //       StringLike: {
+    //         "s3:prefix": ["images/${cognito-identity.amazonaws.com:sub}/*"],
+    //       },
+    //     },
+    //   })
+    // );
+
+    // this._assetsBucket.addToResourcePolicy(
+    //   new PolicyStatement({
+    //     sid: `crudObjectsForUser`,
+    //     principals: [new AnyPrincipal()],
+    //     effect: Effect.ALLOW,
+    //     actions: ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"],
+    //     resources: [
+    //       [
+    //         Arn.format({
+    //           arnFormat: ArnFormat.NO_RESOURCE_NAME,
+    //           service: "s3",
+    //           account: this.account,
+    //           region: this.region,
+    //           partition: this.partition,
+    //           resource: assetsBucketName,
+    //         }),
+    //         "images/",
+    //         "${cognito-identity.amazonaws.com:sub",
+    //         "*",
+    //       ].join("/"),
+    //     ],
+    //   })
+    // );
 
     this._fileUploaderRole = new Role(this, `FileUploaderRole`, {
       roleName: `${props.subDomain}FileUplaoderRole`,
@@ -175,56 +225,14 @@ export class AssetsStack extends NestedStack {
       }
     );
 
-    this._uploadResource.addMethod(
-      "OPTIONS",
-      new MockIntegration({
-        passthroughBehavior: PassthroughBehavior.NEVER,
-        requestTemplates: {
-          "application/json": `{
-            #if($context.identity.apiKey)
-              "statusCode": 204
-            #else
-              "statusCode": 500
-            #end
-          }`,
-        },
-        integrationResponses: [
-          {
-            statusCode: "200",
-            responseParameters: {
-              "method.response.header.Access-Control-Allow-Headers": `'${CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_HEADERS.split(
-                ","
-              )}'`,
-              "method.response.header.Access-Control-Allow-Origin": `'${CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_ORIGIN.split(
-                ","
-              )}'`,
-              "method.response.header.Access-Control-Allow-Credentials": `'${CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_CREDENTIALS}'`,
-              "method.response.header.Access-Control-Allow-Methods": `'${CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_METHODS.split(
-                ","
-              )}'`,
-              "method.response.header.Access-Control-Expose-Headers": `'${CORS_ENV_VARS.ACCESS_CONTROL_EXPOSE_HEADERS.split(
-                ","
-              )}'`,
-            },
-          },
-        ],
-      }),
-      {
-        apiKeyRequired: true,
-        methodResponses: [
-          {
-            statusCode: "204",
-            responseParameters: {
-              "method.response.header.Access-Control-Allow-Headers": true,
-              "method.response.header.Access-Control-Allow-Methods": true,
-              "method.response.header.Access-Control-Allow-Credentials": true,
-              "method.response.header.Access-Control-Allow-Origin": true,
-              "method.response.header.Access-Control-Expose-Headers": true,
-            },
-          },
-        ],
-      }
-    );
+    this._uploadResource.addCorsPreflight({
+      allowOrigins: CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_ORIGIN.split(","),
+      allowCredentials:
+        CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_CREDENTIALS === "true",
+      allowHeaders: CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_HEADERS.split(","),
+      allowMethods: CORS_ENV_VARS.ACCESS_CONTROL_ALLOW_METHODS.split(","),
+      exposeHeaders: CORS_ENV_VARS.ACCESS_CONTROL_EXPOSE_HEADERS.split(","),
+    });
   }
 
   get assetsBucket(): Bucket {

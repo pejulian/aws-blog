@@ -9,8 +9,11 @@ const app = new App({});
 const parentDomain = app.node.tryGetContext(`parentDomain`);
 const subDomain = app.node.tryGetContext(`subDomain`);
 const hostedZoneId = app.node.tryGetContext(`hostedZoneId`);
+
 const enableAuthentication =
   app.node.tryGetContext("enableAuthentication") === "true";
+const enableApiLogging = app.node.tryGetContext("enableApiLogging") === "true";
+const enableApiTracing = app.node.tryGetContext("enableApiTracing") === "true";
 
 if (!parentDomain || !subDomain || !hostedZoneId) {
   throw new Error(`Invalid/missing context`);
@@ -37,6 +40,8 @@ const infrastructureStack = new InfrastructureStack(
     apiDomain,
     authDomain,
     enableAuthentication,
+    enableApiLogging,
+    enableApiTracing,
   }
 );
 

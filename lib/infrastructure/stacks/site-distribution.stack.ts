@@ -191,7 +191,7 @@ export class SiteDistributionStack extends NestedStack {
       zone: props.siteHostedZone,
       target: RecordTarget.fromAlias(new CloudFrontTarget(this._distribution)),
       comment: `Alias record for ${siteDomain}`,
-      ttl: Duration.seconds(60),
+      ttl: Duration.days(1),
     });
   }
 
