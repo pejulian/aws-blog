@@ -44,37 +44,63 @@ export class EdgeLambdaStack extends NestedStack {
     const ESM_REQUIRE_SHIM =
       'await(async()=>{let{dirname:e}=await import(\\"path\\"),{fileURLToPath:i}=await import(\\"url\\");if(typeof globalThis.__filename>\\"u\\"&&(globalThis.__filename=i(import.meta.url)),typeof globalThis.__dirname>\\"u\\"&&(globalThis.__dirname=e(globalThis.__filename)),typeof globalThis.require>\\"u\\"){let{default:a}=await import(\\"module\\");globalThis.require=a.createRequire(import.meta.url)}})();';
 
+    const edgeFunctionProps = (
+      options: Readonly<{
+        currentVersionDescription: string;
+        assetInputFolderName: string;
+        handlerPath: string;
+      }>
+    ): Pick<
+      experimental.EdgeFunctionProps,
+      | "handler"
+      | "architecture"
+      | "runtime"
+      | "memorySize"
+      | "timeout"
+      | "role"
+      | "currentVersionOptions"
+      | "code"
+    > => ({
+      handler: "index.handler",
+      architecture: Architecture.X86_64, // Lambda@Edge currently does not support ARM architecture
+      runtime: Runtime.NODEJS_20_X,
+      memorySize: 128, // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html#limits-lambda-at-edge
+      timeout: Duration.seconds(5), // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html#limits-lambda-at-edge
+      role: props.edgeLambdaRole,
+      currentVersionOptions: {
+        removalPolicy: RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,
+        description: options.currentVersionDescription,
+      },
+      code: Code.fromAsset(path.join(__dirname, "../../../"), {
+        bundling: {
+          command: [
+            "/bin/sh",
+            "-c",
+            [
+              `mkdir -p /asset-input/${options.assetInputFolderName}`,
+              `esbuild ${options.handlerPath} --outfile=/asset-input/${
+                options.assetInputFolderName
+              }/index.js --platform=node --format=esm --target=esnext --minify --bundle --sourcemap --external:@aws-sdk/* --banner:js="/* ${new Date().toUTCString()} */${ESM_REQUIRE_SHIM}"`,
+              `cp -a /asset-input/${options.assetInputFolderName}/. /asset-output/`,
+              `jq -n --arg appname "${siteDomain}" '{ name: $appname, type: "module" }' > ./${options.assetInputFolderName}/package.json`,
+            ].join(" && "),
+          ],
+          image: DockerImage.fromBuild(path.resolve(__dirname, "../../../")),
+        },
+      }),
+    });
+
     this._defaultHandler = new experimental.EdgeFunction(
       this,
       "DefaultHandler",
       {
+        ...edgeFunctionProps({
+          currentVersionDescription: `Default viewer request handler for ${siteDomain}`,
+          assetInputFolderName: "default-target",
+          handlerPath: "src/infrastructure/handlers/default.handler.ts",
+        }),
         functionName: `${sanitizedSiteName}-${EdgeLambdaStack.DEFAULT_HANDLER_SUFFIX}`,
         description: `Default viewer request handler for ${siteDomain}`,
-        handler: "index.handler",
-        architecture: Architecture.X86_64,
-        runtime: Runtime.NODEJS_18_X,
-        memorySize: 128, // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html#limits-lambda-at-edge
-        timeout: Duration.seconds(5), // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html#limits-lambda-at-edge
-        currentVersionOptions: {
-          removalPolicy: RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,
-          description: `Default viewer request handler for ${siteDomain}`,
-        },
-        role: props.edgeLambdaRole,
-        code: Code.fromAsset(path.join(__dirname, "../../../"), {
-          bundling: {
-            command: [
-              "/bin/sh",
-              "-c",
-              [
-                "mkdir -p /asset-input/default-target",
-                `esbuild src/infrastructure/handlers/default.handler.ts --outfile=/asset-input/default-target/index.js --platform=node --format=esm --target=esnext --minify --bundle --sourcemap --external:@aws-sdk/* --banner:js="/* ${new Date().toUTCString()} */${ESM_REQUIRE_SHIM}"`,
-                "cp -a /asset-input/default-target/. /asset-output/",
-                `jq -n --arg appname "${siteDomain}" '{ name: $appname, type: "module" }' > ./default-target/package.json`,
-              ].join(" && "),
-            ],
-            image: DockerImage.fromBuild(path.resolve(__dirname, "../../../")),
-          },
-        }),
       }
     );
 
@@ -82,33 +108,13 @@ export class EdgeLambdaStack extends NestedStack {
       this,
       "CallbackHandler",
       {
+        ...edgeFunctionProps({
+          currentVersionDescription: `Cognito user pool authentication callback handler for ${siteDomain}`,
+          assetInputFolderName: "callback-target",
+          handlerPath: "src/infrastructure/handlers/callback.handler.ts",
+        }),
         functionName: `${sanitizedSiteName}-${EdgeLambdaStack.CALLBACK_HANDLER_SUFFIX}`,
         description: `Cognito user pool authentication callback handler for ${siteDomain}`,
-        handler: "index.handler",
-        architecture: Architecture.X86_64,
-        runtime: Runtime.NODEJS_18_X,
-        memorySize: 128, // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html#limits-lambda-at-edge
-        timeout: Duration.seconds(5), // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html#limits-lambda-at-edge
-        currentVersionOptions: {
-          description: `Cognito user pool authentication callback handler for ${siteDomain}`,
-          removalPolicy: RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,
-        },
-        role: props.edgeLambdaRole,
-        code: Code.fromAsset(path.join(__dirname, "../../../"), {
-          bundling: {
-            command: [
-              "/bin/sh",
-              "-c",
-              [
-                "mkdir -p /asset-input/callback-target",
-                `esbuild src/infrastructure/handlers/callback.handler.ts --outfile=/asset-input/callback-target/index.js --platform=node --format=esm --target=esnext --minify --bundle --sourcemap --external:@aws-sdk/* --banner:js="/* ${new Date().toUTCString()} */${ESM_REQUIRE_SHIM}"`,
-                "cp -a /asset-input/callback-target/. /asset-output/",
-                `jq -n --arg appname "${siteDomain}" '{ name: $appname, type: "module" }' > ./callback-target/package.json`,
-              ].join(" && "),
-            ],
-            image: DockerImage.fromBuild(path.resolve(__dirname, "../../../")),
-          },
-        }),
       }
     );
   }
