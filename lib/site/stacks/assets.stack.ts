@@ -28,6 +28,7 @@ import {
   RestApi,
 } from "aws-cdk-lib/aws-apigateway";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
+import {} from "@aws-cdk/aws-s3objectlambda-alpha";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

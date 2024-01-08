@@ -1,9 +1,9 @@
 {
-  "name": "jucy",
+  "name": "aws-blog",
   "type": "module",
   "version": "0.1.0",
   "bin": {
-    "jucy": "bin/jucy.js"
+    "aws-blog": "bin/aws-blog.js"
   },
   "scripts": {
     "build": "tsc",
