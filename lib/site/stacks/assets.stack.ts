@@ -4,12 +4,11 @@ import { fileURLToPath } from "url";
 import { Construct } from "constructs";
 
 import {
-  Arn,
-  ArnFormat,
   Duration,
   NestedStack,
   NestedStackProps,
   RemovalPolicy,
+  Stack,
 } from "aws-cdk-lib/core";
 import { BlockPublicAccess, Bucket, ObjectOwnership } from "aws-cdk-lib/aws-s3";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -28,7 +27,6 @@ import {
   RestApi,
 } from "aws-cdk-lib/aws-apigateway";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
-import {} from "@aws-cdk/aws-s3objectlambda-alpha";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,6 +95,7 @@ export class AssetsStack extends NestedStack {
     const siteDomain = `${props.subDomain}.${props.parentDomain}`;
 
     const assetsBucketName = `${props.subDomain}-assets-bucket-${this.account}`;
+
     this._assetsBucket = new Bucket(this, `AssetsBucket`, {
       bucketName: assetsBucketName,
       removalPolicy: RemovalPolicy.DESTROY,
@@ -106,53 +105,39 @@ export class AssetsStack extends NestedStack {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
     });
 
-    // this._assetsBucket.addToResourcePolicy(
-    //   new PolicyStatement({
-    //     sid: `listObjectsForUser`,
-    //     principals: [new AnyPrincipal()],
-    //     effect: Effect.ALLOW,
-    //     actions: ["s3:ListBucket"],
-    //     resources: [
-    //       Arn.format({
-    //         arnFormat: ArnFormat.NO_RESOURCE_NAME,
-    //         service: "s3",
-    //         account: this.account,
-    //         region: this.region,
-    //         partition: this.partition,
-    //         resource: assetsBucketName,
-    //       }),
-    //     ],
-    //     conditions: {
-    //       StringLike: {
-    //         "s3:prefix": ["images/${cognito-identity.amazonaws.com:sub}/*"],
-    //       },
-    //     },
-    //   })
-    // );
+    if (props.enableAuthentication) {
+      this._assetsBucket.addToResourcePolicy(
+        new PolicyStatement({
+          sid: `listObjectsForUser`,
+          principals: [new AnyPrincipal()],
+          effect: Effect.ALLOW,
+          actions: ["s3:ListBucket"],
+          resources: [this._assetsBucket.bucketArn],
+          conditions: {
+            StringLike: {
+              "s3:prefix": ["images/${cognito-identity.amazonaws.com:sub}/*"],
+            },
+          },
+        })
+      );
 
-    // this._assetsBucket.addToResourcePolicy(
-    //   new PolicyStatement({
-    //     sid: `crudObjectsForUser`,
-    //     principals: [new AnyPrincipal()],
-    //     effect: Effect.ALLOW,
-    //     actions: ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"],
-    //     resources: [
-    //       [
-    //         Arn.format({
-    //           arnFormat: ArnFormat.NO_RESOURCE_NAME,
-    //           service: "s3",
-    //           account: this.account,
-    //           region: this.region,
-    //           partition: this.partition,
-    //           resource: assetsBucketName,
-    //         }),
-    //         "images/",
-    //         "${cognito-identity.amazonaws.com:sub",
-    //         "*",
-    //       ].join("/"),
-    //     ],
-    //   })
-    // );
+      this._assetsBucket.addToResourcePolicy(
+        new PolicyStatement({
+          sid: `crudObjectsForUser`,
+          principals: [new AnyPrincipal()],
+          effect: Effect.ALLOW,
+          actions: ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"],
+          resources: [
+            [
+              this.assetsBucket.bucketArn,
+              "images/",
+              "${cognito-identity.amazonaws.com:sub}",
+              "*",
+            ].join("/"),
+          ],
+        })
+      );
+    }
 
     this._fileUploaderRole = new Role(this, `FileUploaderRole`, {
       roleName: `${props.subDomain}FileUplaoderRole`,
