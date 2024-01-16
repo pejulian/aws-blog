@@ -8,9 +8,9 @@ if [[ $# -ge 2 ]]; then
 
     shift; shift
     
-    ./node_modules/.bin/cdk deploy --all --profile $PROFILE "$@"
+    # ./node_modules/.bin/cdk deploy --all --profile $PROFILE "$@"
     # ./node_modules/.bin/cdk deploy InfrastructureStack --profile $PROFILE "$@"
-    # ./node_modules/.bin/cdk deploy SiteStack --profile $PROFILE "$@"
+    ./node_modules/.bin/cdk deploy SiteStack --profile $PROFILE "$@"
 
     
     exit $?

@@ -9,6 +9,7 @@ const app = new App({});
 const parentDomain = app.node.tryGetContext(`parentDomain`);
 const subDomain = app.node.tryGetContext(`subDomain`);
 const hostedZoneId = app.node.tryGetContext(`hostedZoneId`);
+const logLevel = app.node.tryGetContext(`logLevel`);
 
 const enableAuthentication =
   app.node.tryGetContext("enableAuthentication") === "true";
@@ -54,6 +55,7 @@ const siteStack = new SiteStack(app, `SiteStack`, {
   apiDomain,
   authDomain,
   enableAuthentication,
+  logLevel,
 });
 
 siteStack.addDependency(infrastructureStack);

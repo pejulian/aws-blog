@@ -30,8 +30,9 @@
     "typescript": "~5.3.3"
   },
   "dependencies": {
+    "@aws-lambda-powertools/logger": "^1.17.0",
     "@aws-sdk/client-s3": "^3.490.0",
-    "@middy/core": "^5.2.3",
+    "@middy/core": "^3.6.2",
     "@middy/error-logger": "^5.2.3",
     "@middy/http-cors": "^5.2.3",
     "@middy/http-error-handler": "^5.2.3",
@@ -42,6 +43,7 @@
     "cookie": "^0.6.0",
     "lodash-es": "^4.17.21",
     "reflect-metadata": "^0.2.1",
+    "sharp": "^0.33.2",
     "source-map-support": "^0.5.21"
   }
 }

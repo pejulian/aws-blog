@@ -12,3 +12,6 @@ dist
 callback-target
 default-target
 assets-output
+
+# OSX
+.DS_Store

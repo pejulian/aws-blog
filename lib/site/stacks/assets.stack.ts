@@ -27,6 +27,7 @@ import {
   RestApi,
 } from "aws-cdk-lib/aws-apigateway";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
+import { Architecture } from "aws-cdk-lib/aws-lambda";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +38,7 @@ export interface AssetsStackProps extends NestedStackProps {
   apiDomain: string;
   siteDomain: string;
   enableAuthentication: boolean;
+  logLevel?: string;
 }
 
 export class AssetsStack extends NestedStack {
@@ -105,39 +107,39 @@ export class AssetsStack extends NestedStack {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
     });
 
-    if (props.enableAuthentication) {
-      this._assetsBucket.addToResourcePolicy(
-        new PolicyStatement({
-          sid: `listObjectsForUser`,
-          principals: [new AnyPrincipal()],
-          effect: Effect.ALLOW,
-          actions: ["s3:ListBucket"],
-          resources: [this._assetsBucket.bucketArn],
-          conditions: {
-            StringLike: {
-              "s3:prefix": ["images/${cognito-identity.amazonaws.com:sub}/*"],
-            },
-          },
-        })
-      );
+    // if (props.enableAuthentication) {
+    //   this._assetsBucket.addToResourcePolicy(
+    //     new PolicyStatement({
+    //       sid: `listObjectsForUser`,
+    //       principals: [new AnyPrincipal()],
+    //       effect: Effect.ALLOW,
+    //       actions: ["s3:ListBucket"],
+    //       resources: [this._assetsBucket.bucketArn],
+    //       conditions: {
+    //         StringLike: {
+    //           "s3:prefix": ["images/${cognito-identity.amazonaws.com:sub}/*"],
+    //         },
+    //       },
+    //     })
+    //   );
 
-      this._assetsBucket.addToResourcePolicy(
-        new PolicyStatement({
-          sid: `crudObjectsForUser`,
-          principals: [new AnyPrincipal()],
-          effect: Effect.ALLOW,
-          actions: ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"],
-          resources: [
-            [
-              this.assetsBucket.bucketArn,
-              "images/",
-              "${cognito-identity.amazonaws.com:sub}",
-              "*",
-            ].join("/"),
-          ],
-        })
-      );
-    }
+    //   this._assetsBucket.addToResourcePolicy(
+    //     new PolicyStatement({
+    //       sid: `crudObjectsForUser`,
+    //       principals: [new AnyPrincipal()],
+    //       effect: Effect.ALLOW,
+    //       actions: ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"],
+    //       resources: [
+    //         [
+    //           this.assetsBucket.bucketArn,
+    //           "images/",
+    //           "${cognito-identity.amazonaws.com:sub}",
+    //           "*",
+    //         ].join("/"),
+    //       ],
+    //     })
+    //   );
+    // }
 
     this._fileUploaderRole = new Role(this, `FileUploaderRole`, {
       roleName: `${props.subDomain}FileUplaoderRole`,
@@ -172,6 +174,7 @@ export class AssetsStack extends NestedStack {
         entry: path.join(__dirname, "../../../src/site/uploader/index.ts"),
         handler: "handler",
         timeout: Duration.seconds(28),
+        architecture: Architecture.ARM_64,
         role: this._fileUploaderRole,
         bundling: {
           format: OutputFormat.ESM,

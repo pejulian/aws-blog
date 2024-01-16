@@ -4,7 +4,6 @@ import { fileURLToPath } from "url";
 import { Construct } from "constructs";
 
 import {
-  ArnFormat,
   Duration,
   NestedStack,
   NestedStackProps,
@@ -16,28 +15,28 @@ import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import {
   AccountRootPrincipal,
   AnyPrincipal,
+  ManagedPolicy,
   PolicyStatement,
 } from "aws-cdk-lib/aws-iam";
+import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export interface AssetsStackProps extends NestedStackProps {
+export interface ThumbnailStackProps extends NestedStackProps {
   subDomain: string;
-  parentDomain: string;
-  apiDomain: string;
-  siteDomain: string;
   bucket: Bucket;
+  logLevel?: string;
 }
 
 const ESM_REQUIRE_SHIM =
   'await(async()=>{let{dirname:e}=await import(\\"path\\"),{fileURLToPath:i}=await import(\\"url\\");if(typeof globalThis.__filename>\\"u\\"&&(globalThis.__filename=i(import.meta.url)),typeof globalThis.__dirname>\\"u\\"&&(globalThis.__dirname=e(globalThis.__filename)),typeof globalThis.require>\\"u\\"){let{default:a}=await import(\\"module\\");globalThis.require=a.createRequire(import.meta.url)}})();';
 
-export class AssetsStack extends NestedStack {
+export class ThumbnailStack extends NestedStack {
   private readonly _accessBucketAccessPoint: AccessPoint;
   private readonly _assetsBucketAccessPointHandler: NodejsFunction;
 
-  constructor(scope: Construct, id: string, props: AssetsStackProps) {
+  constructor(scope: Construct, id: string, props: ThumbnailStackProps) {
     super(scope, id, {
       ...props,
       description: `[${props.subDomain}] Nested stack defining storage for site assets uploaded by users`,
@@ -56,32 +55,39 @@ export class AssetsStack extends NestedStack {
       })
     );
 
-    const accessPoint = Stack.of(this).formatArn({
-      resource: "accesspoint",
-      resourceName: `${props.bucket.bucketName}-ap`,
-      service: "s3",
-      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-    });
-
-    console.log(`accessPoint`, accessPoint);
-
     this._assetsBucketAccessPointHandler = new NodejsFunction(
       this,
       `AssetsBucketAccessPointFunction`,
       {
+        functionName: `AssetsBucketAccessPointFunction`,
+        description: `S3 Object lambda function that handles resizing of images in the ${props.bucket.bucketName} bucket into thumbnails`,
         entry: path.join(
           __dirname,
           "../../../src/site/assets/object-lambda/index.ts"
         ),
+        architecture: Architecture.ARM_64,
         handler: "handler",
+        runtime: Runtime.NODEJS_20_X,
+        memorySize: 256,
+        environment: {
+          POWERTOOLS_LOG_LEVEL: props.logLevel ?? "ERROR",
+          POWERTOOLS_SERVICE_NAME: `AssetsThumbnailObjectLambda`,
+        },
         timeout: Duration.minutes(1),
         bundling: {
           format: OutputFormat.ESM,
           minify: true,
           sourceMap: false,
           banner: ESM_REQUIRE_SHIM,
+          externalModules: ["sharp"],
         },
       }
+    );
+
+    this._assetsBucketAccessPointHandler.role?.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName(
+        `service-role/AWSLambdaBasicExecutionRole`
+      )
     );
 
     // only allow this account to call this lambda
@@ -96,11 +102,11 @@ export class AssetsStack extends NestedStack {
 
     this._accessBucketAccessPoint = new AccessPoint(
       this,
-      `AccessBucketAccessPoint`,
+      `AssetsBucketAccessPoint`,
       {
         bucket: props.bucket,
         handler: this._assetsBucketAccessPointHandler,
-        accessPointName: `${props.bucket.bucketName}-access-point`,
+        accessPointName: `thumbnail-generator-access-point`,
         supportsGetObjectPartNumber: true,
         supportsGetObjectRange: true,
         payload: {
@@ -108,5 +114,13 @@ export class AssetsStack extends NestedStack {
         },
       }
     );
+
+    this.exportValue(this._accessBucketAccessPoint.accessPointArn, {
+      name: `AssetsBucketAccessPointArn`,
+    });
+  }
+
+  get accessPoint(): AccessPoint {
+    return this._accessBucketAccessPoint;
   }
 }
